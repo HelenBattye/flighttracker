@@ -33,3 +33,16 @@ Logos are fetched automatically by airline ICAO code from
 
 Logos are dithered by default. For solid logos set `LOGO_THRESHOLD` (1-254, e.g. `128`): pixels
 darker than the value become black, the rest white, giving crisp edges. Use `0` to dither.
+
+## Night mode, errors and the sightings log
+
+- **Night mode:** between `NIGHT_START` (default 23) and `NIGHT_END` (default 7) the display shows
+  a near-blank card and stops polling. Set both to the same value to turn it off.
+- **Receiver unreachable:** if the feed can't be read, the display says so (instead of looking
+  like a quiet sky) and recovers by itself.
+- **Flights with no route** (private and light aircraft) show the aircraft type from the receiver's
+  data instead of `??? > ???`.
+- **Sightings log:** every flight shown is appended to `sightings.csv` (git-ignored).
+
+On a Raspberry Pi, set the time zone first (`sudo raspi-config` > Localisation > Timezone), or the
+clock and night mode will follow UTC.

@@ -11,6 +11,8 @@ class Config:
     radius_km: float = 25.0
     min_altitude_ft: int = 500
     poll_seconds: int = 20
+    night_start: int = 23  # hour (0-23) the display goes quiet; equal start and end disables it
+    night_end: int = 7
     width: int = 400
     height: int = 300
 
@@ -23,4 +25,6 @@ def load() -> Config:
         radius_km=float(os.environ.get("RADIUS_KM", 25)),
         min_altitude_ft=int(os.environ.get("MIN_ALTITUDE_FT", 500)),
         poll_seconds=int(os.environ.get("POLL_SECONDS", 20)),
+        night_start=int(os.environ.get("NIGHT_START", 23)),
+        night_end=int(os.environ.get("NIGHT_END", 7)),
     )

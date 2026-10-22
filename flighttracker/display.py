@@ -22,7 +22,7 @@ class WebDisplay:
     PAGE = (
         b"<!doctype html><meta charset=utf-8><title>Flight tracker</title>"
         b"<body style='margin:0;background:#ddd;display:grid;place-items:center;height:100vh'>"
-        b"<img id=c src=card.png style='border:12px solid #c9a36b;background:#fff;image-rendering:pixelated;width:min(90vw,800px)'>"
+        b"<img id=c src=card.png style='border:12px solid #c9a36b;background:#fff;image-rendering:pixelated;max-width:90vw;max-height:85vh;aspect-ratio:4/3'>"
         b"<script>setInterval(()=>c.src='card.png?'+Date.now(),3000)</script>"
     )
 

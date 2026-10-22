@@ -13,6 +13,8 @@ class Aircraft:
     altitude_ft: int
     speed_kt: float
     distance_km: float
+    type_code: str = ""  # e.g. "B738", from the receiver's own database when it has one
+    registration: str = ""  # e.g. "G-VNEA"
 
 
 def haversine_km(lat1, lon1, lat2, lon2) -> float:
@@ -41,6 +43,8 @@ def fetch_aircraft(url: str, home_lat: float, home_lon: float) -> list[Aircraft]
                 altitude_ft=int(alt),
                 speed_kt=float(a.get("gs") or 0),
                 distance_km=haversine_km(home_lat, home_lon, a["lat"], a["lon"]),
+                type_code=a.get("t", ""),
+                registration=a.get("r", ""),
             )
         )
     return out
