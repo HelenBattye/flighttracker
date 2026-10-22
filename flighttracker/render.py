@@ -58,7 +58,10 @@ def render_card(
     mid = _font(BOLD_CANDIDATES, 26)
 
     logo_box = (110, 80)
-    logo = load_logo(d.airline_icao, logo_box) if d.airline_icao else None
+    # airline callsigns start with the 3-letter ICAO code (EXS2PT -> EXS) when the lookup has none
+    cs = ac.callsign
+    icao = d.airline_icao or (cs[:3] if cs[:3].isalpha() and cs[3:4].isdigit() else "")
+    logo = load_logo(icao, logo_box) if icao else None
     if logo:
         # top-right, level with the route line
         img.paste(logo, (width - m - logo.width, 70 + (logo_box[1] - logo.height) // 2))
