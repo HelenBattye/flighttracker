@@ -1,4 +1,7 @@
+import io
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from threading import Thread
 
 from PIL import Image
 
@@ -11,6 +14,45 @@ class PreviewDisplay:
 
     def show(self, img: Image.Image) -> None:
         img.convert("RGB").save(self.path)
+
+
+class WebDisplay:
+    """Serves the latest card in a browser (auto-refreshing), for use before the e-paper arrives."""
+
+    PAGE = (
+        b"<!doctype html><meta charset=utf-8><title>Flight tracker</title>"
+        b"<body style='margin:0;background:#ddd;display:grid;place-items:center;height:100vh'>"
+        b"<img id=c src=card.png style='border:12px solid #c9a36b;background:#fff;image-rendering:pixelated;width:min(90vw,800px)'>"
+        b"<script>setInterval(()=>c.src='card.png?'+Date.now(),3000)</script>"
+    )
+
+    def __init__(self, port: int = 8000):
+        self.png = b""
+        outer = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.startswith("/card.png"):
+                    body, kind = outer.png, "image/png"
+                else:
+                    body, kind = outer.PAGE, "text/html"
+                self.send_response(200)
+                self.send_header("Content-Type", kind)
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+        Thread(target=self.server.serve_forever, daemon=True).start()
+        print(f"Open http://localhost:{port}")
+
+    def show(self, img: Image.Image) -> None:
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, "PNG")
+        self.png = buf.getvalue()
 
 
 class EpaperDisplay:

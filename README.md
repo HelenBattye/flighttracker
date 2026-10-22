@@ -4,15 +4,19 @@ Shows the aircraft currently overhead on a small e-paper display, using a local 
 (RTL-SDR dongle on a Raspberry Pi running readsb/dump1090/tar1090) for live positions and
 adsbdb.com for route and aircraft details.
 
-## Run (preview mode, no hardware)
+## Run (browser view, no hardware)
+
+Defaults to `--display web`: open http://localhost:8000 and the card refreshes itself.
+Use `--display preview` to write `preview.png` instead.
+
 
 ```
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 export AIRCRAFT_URL=http://<receiver-pi>/tar1090/data/aircraft.json
 export HOME_LAT=51.5 HOME_LON=-0.12
-python -m flighttracker.main --once      # writes preview.png
-python -m flighttracker.main             # keeps polling
+python -m flighttracker.main --display preview --once   # writes preview.png
+python -m flighttracker.main             # browser view on :8000
 ```
 
 Optional: `RADIUS_KM` (25), `MIN_ALTITUDE_FT` (500), `POLL_SECONDS` (20).

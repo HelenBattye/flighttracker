@@ -2,7 +2,7 @@ import argparse
 import time
 
 from . import config
-from .display import EpaperDisplay, PreviewDisplay
+from .display import EpaperDisplay, PreviewDisplay, WebDisplay
 from .feed import fetch_aircraft
 from .lookup import lookup
 from .render import render_card
@@ -11,12 +11,12 @@ from .select import pick
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show the aircraft overhead on an e-paper display.")
-    parser.add_argument("--display", choices=["preview", "epaper"], default="preview")
+    parser.add_argument("--display", choices=["web", "preview", "epaper"], default="web")
     parser.add_argument("--once", action="store_true", help="run a single update and exit")
     args = parser.parse_args()
 
     cfg = config.load()
-    display = EpaperDisplay() if args.display == "epaper" else PreviewDisplay()
+    display = {"web": WebDisplay, "preview": PreviewDisplay, "epaper": EpaperDisplay}[args.display]()
 
     current_hex = None
     last_shown = object()  # avoid refreshing e-paper when nothing changed
