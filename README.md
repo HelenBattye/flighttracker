@@ -30,3 +30,6 @@ Install the Waveshare `waveshare_epd` library, then run with `--display epaper`.
 Logos are fetched automatically by airline ICAO code from
 [Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) and cached in `logos/`
 (git-ignored, as they are trademarks). To use your own, save `logos/<ICAO>.png` (e.g. `TOM.png`).
+
+Logos are dithered by default. For solid logos set `LOGO_THRESHOLD` (1-254, e.g. `128`): pixels
+darker than the value become black, the rest white, giving crisp edges. Use `0` to dither.

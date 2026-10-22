@@ -4,6 +4,7 @@ Logos are trademarks of their owners, so the logos folder is git-ignored. Drop y
 <ICAO>.png files in there to override the downloaded ones.
 """
 
+import os
 from pathlib import Path
 
 import requests
@@ -25,8 +26,14 @@ def _download(icao: str, path: Path) -> bool:
     return False
 
 
-def load_logo(icao: str, box: tuple[int, int]) -> Image.Image | None:
-    """Return the logo as a 1-bit image fitted inside box, or None if unavailable."""
+def load_logo(icao: str, box: tuple[int, int], threshold: int | None = None) -> Image.Image | None:
+    """Return the logo as a 1-bit image fitted inside box, or None if unavailable.
+
+    threshold: 0 dithers (keeps shading, looks dotty); 1-254 makes every pixel darker than
+    that value black and the rest white (crisp for solid logos). Defaults to $LOGO_THRESHOLD or 0.
+    """
+    if threshold is None:
+        threshold = int(os.environ.get("LOGO_THRESHOLD", 0))
     if not icao.isalnum():
         return None
     LOGO_DIR.mkdir(exist_ok=True)
@@ -39,4 +46,6 @@ def load_logo(icao: str, box: tuple[int, int]) -> Image.Image | None:
     flat = Image.new("RGBA", img.size, "white")  # transparent areas become white
     img = Image.alpha_composite(flat, img).convert("L")
     img.thumbnail(box, Image.LANCZOS)
+    if threshold:
+        return img.point(lambda p: 255 if p >= threshold else 0).convert("1", dither=Image.Dither.NONE)
     return img.convert("1")  # Floyd-Steinberg dithering keeps colour logos recognisable
