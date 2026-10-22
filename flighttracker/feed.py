@@ -27,7 +27,8 @@ def fetch_aircraft(url: str, home_lat: float, home_lon: float) -> list[Aircraft]
     """Read readsb/dump1090/tar1090 aircraft.json and keep airborne aircraft with a position."""
     data = requests.get(url, timeout=5).json()
     out = []
-    for a in data.get("aircraft", []):
+    # local receivers use "aircraft"; adsb.lol / airplanes.live use "ac"
+    for a in data.get("aircraft") or data.get("ac") or []:
         alt = a.get("alt_baro")
         if "lat" not in a or "lon" not in a or not isinstance(alt, (int, float)):
             continue  # no position, or "ground"
