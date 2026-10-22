@@ -1,5 +1,6 @@
 import argparse
 import time
+from datetime import datetime
 
 from . import config
 from .display import EpaperDisplay, PreviewDisplay, WebDisplay
@@ -30,7 +31,8 @@ def main() -> None:
             ac = None
 
         current_hex = ac.hex if ac else None
-        key = ac.hex if ac else None
+        # the clock changes every minute; a flight card only when the plane changes
+        key = ac.hex if ac else datetime.now().strftime("%H:%M")
         if key != last_shown:
             details = lookup(ac.callsign, ac.hex) if ac else None
             display.show(render_card(ac, details, cfg.width, cfg.height))

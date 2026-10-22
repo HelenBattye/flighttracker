@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PIL import Image, ImageDraw, ImageFont
 
 from .feed import Aircraft
@@ -28,14 +30,25 @@ def _fit(draw, text, font, max_width) -> str:
     return text
 
 
-def render_card(ac: Aircraft | None, d: Details | None, width: int = 400, height: int = 300) -> Image.Image:
+def render_card(
+    ac: Aircraft | None,
+    d: Details | None,
+    width: int = 400,
+    height: int = 300,
+    now: datetime | None = None,
+) -> Image.Image:
     img = Image.new("1", (width, height), 1)
     draw = ImageDraw.Draw(img)
     m = 16
     inner = width - 2 * m
 
     if ac is None or d is None:
-        draw.text((m, height // 2 - 12), "No flights overhead", font=_font(BOLD_CANDIDATES, 24), fill=0)
+        now = now or datetime.now()
+        clock = _font(BOLD_CANDIDATES, 96)
+        date = _font(FONT_CANDIDATES, 22)
+        text = now.strftime("%H:%M")
+        draw.text((width / 2, height / 2 - 20), text, font=clock, fill=0, anchor="mm")
+        draw.text((width / 2, height / 2 + 55), now.strftime("%A %-d %B"), font=date, fill=0, anchor="mm")
         return img
 
     title = _font(BOLD_CANDIDATES, 28)
