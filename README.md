@@ -24,3 +24,9 @@ Optional: `RADIUS_KM` (25), `MIN_ALTITUDE_FT` (500), `POLL_SECONDS` (20).
 ## On the display Pi
 
 Install the Waveshare `waveshare_epd` library, then run with `--display epaper`.
+
+## Airline logos
+
+Logos are fetched automatically by airline ICAO code from
+[Jxck-S/airline-logos](https://github.com/Jxck-S/airline-logos) and cached in `logos/`
+(git-ignored, as they are trademarks). To use your own, save `logos/<ICAO>.png` (e.g. `TOM.png`).

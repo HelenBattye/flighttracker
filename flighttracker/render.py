@@ -3,6 +3,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 
 from .feed import Aircraft
+from .logos import load_logo
 from .lookup import Details
 
 FONT_CANDIDATES = [
@@ -55,6 +56,12 @@ def render_card(
     big = _font(BOLD_CANDIDATES, 34)
     small = _font(FONT_CANDIDATES, 15)
     mid = _font(BOLD_CANDIDATES, 26)
+
+    logo_box = (110, 80)
+    logo = load_logo(d.airline_icao, logo_box) if d.airline_icao else None
+    if logo:
+        # top-right, level with the route line
+        img.paste(logo, (width - m - logo.width, 70 + (logo_box[1] - logo.height) // 2))
 
     y = m
     draw.text((m, y), _fit(draw, d.airline or ac.callsign, title, inner), font=title, fill=0)

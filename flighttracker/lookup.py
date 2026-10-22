@@ -11,6 +11,7 @@ BASE = "https://api.adsbdb.com/v0"
 @dataclass(frozen=True)
 class Details:
     airline: str = ""
+    airline_icao: str = ""
     origin_code: str = ""
     origin_name: str = ""
     destination_code: str = ""
@@ -38,6 +39,7 @@ def lookup(callsign: str, hex_code: str) -> Details:
     airline = route.get("airline") or {}
     return Details(
         airline=airline.get("name", ""),
+        airline_icao=airline.get("icao", ""),
         origin_code=origin.get("iata_code", ""),
         origin_name=origin.get("name", ""),
         destination_code=dest.get("iata_code", ""),
