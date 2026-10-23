@@ -7,7 +7,7 @@ the photographer. Planespotters requires a descriptive User-Agent: https://www.p
 from pathlib import Path
 
 import requests
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 PHOTO_DIR = Path("photos")
 API = "https://api.planespotters.net/pub/photos/hex/{hex}"
@@ -25,14 +25,49 @@ def _download(hex_code: str, base: Path) -> bool:
         if not photos:
             base.with_suffix(".missing").touch()
             return False
-        image = requests.get(photos[0]["thumbnail"]["src"], headers=HEADERS, timeout=5)
+        # the large image (about 500 px) gives the 1-bit conversion far more to work with than the thumbnail
+        source = (photos[0].get("thumbnail_large") or photos[0]["thumbnail"])["src"]
+        image = requests.get(source, headers=HEADERS, timeout=5)
         if not image.ok:
             return False
-        base.with_suffix(".jpg").write_bytes(image.content)
+        _jpg(base).write_bytes(image.content)
         base.with_suffix(".txt").write_text(photos[0].get("photographer") or "")
         return True
     except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError):
         return False
+
+
+def _jpg(base: Path) -> Path:
+    return base.with_name(base.name + "-large.jpg")
+
+
+def _flatten(img: Image.Image, radius: int = 10, strength: float = 0.97) -> Image.Image:
+    """Divide each pixel by its local average so flat areas (sky) go white and detail stays dark.
+
+    Without this, a grey sky dithers into a busy checkerboard that fights with the aircraft."""
+    average = img.filter(ImageFilter.GaussianBlur(radius)).tobytes()
+    out = bytes(min(255, int(255 * p / (a + 1) * strength)) if a else 255 for p, a in zip(img.tobytes(), average))
+    return Image.frombytes("L", img.size, out)
+
+
+def _atkinson(img: Image.Image) -> Image.Image:
+    """Atkinson dithering: crisper than Floyd-Steinberg on small images, as on the early Macs."""
+    w, h = img.size
+    px = [float(p) for p in img.tobytes()]
+    for y in range(h):
+        for x in range(w):
+            i = y * w + x
+            old = px[i]
+            new = 255.0 if old >= 128 else 0.0
+            px[i] = new
+            err = (old - new) / 8
+            for dx, dy in ((1, 0), (2, 0), (-1, 1), (0, 1), (1, 1), (0, 2)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < w and 0 <= ny < h:
+                    px[ny * w + nx] += err
+    out = Image.new("1", (w, h))
+    out.putdata([255 if p >= 128 else 0 for p in px])
+    return out
 
 
 def load_photo(hex_code: str, box: tuple[int, int] = PHOTO_BOX) -> tuple[Image.Image, str] | None:
@@ -41,14 +76,15 @@ def load_photo(hex_code: str, box: tuple[int, int] = PHOTO_BOX) -> tuple[Image.I
         return None
     PHOTO_DIR.mkdir(exist_ok=True)
     base = PHOTO_DIR / hex_code.lower()
-    if not base.with_suffix(".jpg").exists():
+    if not _jpg(base).exists():
         if base.with_suffix(".missing").exists() or not _download(hex_code.lower(), base):
             return None
     try:
-        img = Image.open(base.with_suffix(".jpg")).convert("L")
+        img = Image.open(_jpg(base)).convert("L")
     except OSError:
         return None  # corrupt download
-    img = ImageOps.autocontrast(img, cutoff=2)  # dithering needs the contrast on a 1-bit panel
     img.thumbnail(box, Image.LANCZOS)
+    img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=150, threshold=2))
+    img = ImageOps.autocontrast(_flatten(img), cutoff=1)  # a 1-bit panel needs all the contrast it can get
     credit = base.with_suffix(".txt").read_text() if base.with_suffix(".txt").exists() else ""
-    return img.convert("1"), credit
+    return _atkinson(img), credit

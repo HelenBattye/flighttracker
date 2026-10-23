@@ -12,7 +12,7 @@ from flighttracker.feed import Aircraft, fetch_aircraft
 from datetime import datetime
 
 import requests
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 import io
 
@@ -254,7 +254,7 @@ def _jpeg_bytes() -> bytes:
 
 
 def _photo_responses(photographer="Jane Spotter"):
-    api = _json_response({"photos": [{"thumbnail": {"src": "https://t.example/a_t.jpg"}, "photographer": photographer}]})
+    api = _json_response({"photos": [{"thumbnail_large": {"src": "https://t.example/a_280.jpg"}, "photographer": photographer}]})
     image = Mock(ok=True, content=_jpeg_bytes())
     return [api, image]
 
@@ -282,6 +282,17 @@ class PhotoTests(unittest.TestCase):
         self.assertIsNotNone(second)
         self.assertEqual(get.call_count, 2)  # one API call and one image download in total
         self.assertIn("User-Agent", get.call_args.kwargs["headers"])
+
+    def test_flat_sky_goes_white_and_the_subject_stays_dark(self):
+        sky = Image.new("L", (130, 73), 150)  # mid-grey sky, which plain dithering turns into a checkerboard
+        for x in range(40, 90):
+            for y in range(30, 40):
+                sky.putpixel((x, y), 20)  # dark aircraft body
+        out = photos._atkinson(ImageOps.autocontrast(photos._flatten(sky), cutoff=1))
+        corner = out.crop((0, 0, 30, 20)).convert("L").getextrema()
+        body = out.crop((50, 32, 80, 38)).convert("L").getextrema()
+        self.assertEqual(corner, (255, 255))
+        self.assertEqual(body, (0, 0))
 
     @patch("flighttracker.photos.requests.get")
     def test_aircraft_without_a_photo_are_remembered(self, get):
