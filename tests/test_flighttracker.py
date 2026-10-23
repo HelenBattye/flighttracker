@@ -333,6 +333,14 @@ class PhotoCardTests(unittest.TestCase):
         self.assertEqual(with_photo.size, (400, 300))
         self.assertNotEqual(plain.tobytes(), with_photo.tobytes())
 
+    def test_without_a_credit_the_airport_lines_move_up(self, _logo):
+        pic, _ = self._photo()
+        credited = render_card(self.aircraft, self.details, photo=(pic, "Jane Spotter"))
+        plain = render_card(self.aircraft, self.details, photo=(pic, ""))
+        row = 164 + pic.height + 8
+        self.assertIsNotNone(plain.crop((16, row, 250, row + 9)).convert("L").point(lambda p: 255 - p).getbbox())
+        self.assertIsNone(credited.crop((16, row, 250, row + 9)).convert("L").point(lambda p: 255 - p).getbbox())
+
     def test_photo_sits_level_with_the_speed_row_and_airport_names_run_underneath(self, _logo):
         pic, credit = self._photo()
         img = render_card(self.aircraft, self.details, photo=(pic, credit))

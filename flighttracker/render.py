@@ -119,7 +119,7 @@ def render_card(
         pic, credit = photo
         x, top = width - m - pic.width, 164
         img.paste(pic, (x, top))
-        names_y = top + pic.height + 19
+        names_y = top + pic.height + (19 if credit else 8)  # the airport lines tuck up when there's no credit
         if credit:
             tiny = _font(FONT_CANDIDATES, 10)
             draw.text((x, top + pic.height + 3), _fit(draw, f"Photo: {credit}", tiny, pic.width), font=tiny, fill=0)

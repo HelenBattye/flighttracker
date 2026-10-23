@@ -21,6 +21,13 @@ def is_night(hour: int, start: int, end: int) -> bool:
     return start <= hour < end if start < end else hour >= start or hour < end
 
 
+def _photo(hex_code: str, cfg: config.Config):
+    photo = load_photo(hex_code) if cfg.show_photos else None
+    if photo and not cfg.show_photo_credit:
+        photo = (photo[0], "")  # credit left off the card (PHOTO_CREDIT=1 to show it)
+    return photo
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show the aircraft overhead on an e-paper display.")
     parser.add_argument("--display", choices=["web", "preview", "epaper"], default="web")
@@ -60,8 +67,8 @@ def main() -> None:
                 if not demo:
                     details = lookup(ac.callsign, ac.hex)
                 key, card = ac.hex, lambda: render_card(
-                        ac, details, *size, photo=load_photo(ac.hex) if cfg.show_photos else None, eta=estimate_eta(ac, details)
-                    )
+                    ac, details, *size, photo=_photo(ac.hex, cfg), eta=estimate_eta(ac, details)
+                )
             else:
                 key, card = now.strftime("%H:%M"), lambda: render_clock(*size, now)  # redraw each minute
 
