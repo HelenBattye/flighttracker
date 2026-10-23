@@ -5,6 +5,8 @@ from threading import Thread
 
 from PIL import Image
 
+from . import stats
+
 
 class PreviewDisplay:
     """Saves the card as a PNG so you can develop without the e-paper hardware."""
@@ -34,6 +36,8 @@ class WebDisplay:
             def do_GET(self):
                 if self.path.startswith("/card.png"):
                     body, kind = outer.png, "image/png"
+                elif self.path.startswith("/stats"):
+                    body, kind = stats.render_html(stats.summarise(stats.load())), "text/html"
                 else:
                     body, kind = outer.PAGE, "text/html"
                 self.send_response(200)

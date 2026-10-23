@@ -1,0 +1,18 @@
+# Runs the tracker on the display Pi at boot.
+#   sudo cp deploy/flighttracker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now flighttracker
+# Adjust User and the two paths if your username or checkout location differs.
+[Unit]
+Description=Flight tracker e-paper display
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/flighttracker
+ExecStart=/home/pi/flighttracker/.venv/bin/python -m flighttracker.main --display epaper
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

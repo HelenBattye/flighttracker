@@ -1,0 +1,163 @@
+import csv
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from flighttracker import config, stats
+from flighttracker.demo import FLIGHTS, flights
+from flighttracker.feed import Aircraft, fetch_aircraft
+from flighttracker.lookup import Details
+from flighttracker.main import is_night
+from flighttracker.select import pick
+from flighttracker.sightings import FIELDS, log_sighting
+
+
+class PickTests(unittest.TestCase):
+    def setUp(self):
+        self.near = Aircraft("abc123", "FLT1", 51.5, -0.1, 5000, 200, 10)
+        self.far = Aircraft("def456", "FLT2", 51.6, -0.1, 6000, 200, 20)
+
+    def test_picks_nearest_eligible_aircraft(self):
+        self.assertEqual(pick([self.far, self.near], 20, 500).hex, "abc123")
+
+    def test_keeps_current_aircraft_while_eligible(self):
+        self.assertEqual(pick([self.far, self.near], 20, 500, "def456").hex, "def456")
+
+    def test_excludes_aircraft_outside_limits_or_without_callsign(self):
+        no_callsign = Aircraft("ghi789", "", 51.5, -0.1, 5000, 200, 5)
+        self.assertIsNone(pick([self.near, self.far, no_callsign], 9, 500))
+        self.assertIsNone(pick([self.near, self.far], 20, 6001))
+
+
+class FeedTests(unittest.TestCase):
+    @patch("flighttracker.feed.requests.get")
+    def test_parses_receiver_aircraft_format_and_skips_ground(self, get):
+        response = Mock()
+        response.json.return_value = {
+            "aircraft": [
+                {"hex": "abc123", "flight": " FLT1 ", "lat": 51.5, "lon": -0.1,
+                 "alt_baro": 12000, "gs": 220, "t": "B738", "r": "G-ABCD"},
+                {"hex": "def456", "lat": 51.5, "lon": -0.1, "alt_baro": "ground"},
+            ]
+        }
+        get.return_value = response
+
+        aircraft = fetch_aircraft("http://receiver/aircraft.json", 51.5, -0.1)
+
+        self.assertEqual(len(aircraft), 1)
+        self.assertEqual(aircraft[0].callsign, "FLT1")
+        self.assertEqual(aircraft[0].altitude_ft, 12000)
+        self.assertEqual(aircraft[0].type_code, "B738")
+        self.assertEqual(aircraft[0].distance_km, 0)
+        get.assert_called_once_with("http://receiver/aircraft.json", timeout=5)
+
+    @patch("flighttracker.feed.requests.get")
+    def test_accepts_ac_feed_format(self, get):
+        response = Mock()
+        response.json.return_value = {
+            "ac": [{"hex": "abc123", "lat": 51.5, "lon": -0.1, "alt_baro": 12000}]
+        }
+        get.return_value = response
+
+        self.assertEqual(len(fetch_aircraft("http://feed", 51.5, -0.1)), 1)
+
+
+class SightingTests(unittest.TestCase):
+    def test_writes_header_once_and_records_aircraft_details(self):
+        aircraft = Aircraft("abc123", "FLT1", 51.5, -0.1, 12000, 220, 3.26, "B738", "G-ABCD")
+        details = Details(airline="Example Air", origin_code="LHR", destination_code="EDI")
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sightings.csv"
+            log_sighting(aircraft, details, path)
+            log_sighting(aircraft, details, path)
+
+            with path.open(newline="") as file:
+                rows = list(csv.reader(file))
+
+        self.assertEqual(rows[0], FIELDS)
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[1][1:10], ["abc123", "FLT1", "G-ABCD", "Example Air", "LHR", "EDI", "B738", "12000", "3.3"])
+
+
+class ConfigTests(unittest.TestCase):
+    def test_defaults_to_public_feed_around_home(self):
+        with patch.dict("os.environ", {"HOME_LAT": "51.5", "HOME_LON": "-0.12", "RADIUS_KM": "37"}, clear=True), \
+                patch("flighttracker.config.load_dotenv"):
+            cfg = config.load()
+        self.assertEqual(cfg.aircraft_url, "https://api.adsb.lol/v2/point/51.5/-0.12/20")
+
+    def test_explicit_feed_url_wins(self):
+        env = {"HOME_LAT": "1", "HOME_LON": "2", "AIRCRAFT_URL": "http://pi/aircraft.json"}
+        with patch.dict("os.environ", env, clear=True), patch("flighttracker.config.load_dotenv"):
+            self.assertEqual(config.load().aircraft_url, "http://pi/aircraft.json")
+
+    def test_placeholder_location_gives_a_clear_error(self):
+        with patch.dict("os.environ", {"HOME_LAT": "<lat>", "HOME_LON": "2"}, clear=True), \
+                patch("flighttracker.config.load_dotenv"):
+            with self.assertRaises(SystemExit):
+                config.load()
+
+    def test_dotenv_fills_gaps_but_never_overrides_environment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / ".env"
+            path.write_text("# comment\nHOME_LAT=51.5\nexport HOME_LON='-0.12'\nPOLL_SECONDS=5\n")
+            with patch.dict("os.environ", {"POLL_SECONDS": "99"}, clear=True):
+                config.load_dotenv(path)
+                self.assertEqual(os.environ["HOME_LAT"], "51.5")
+                self.assertEqual(os.environ["HOME_LON"], "-0.12")
+                self.assertEqual(os.environ["POLL_SECONDS"], "99")
+
+
+class NightTests(unittest.TestCase):
+    def test_window_crossing_midnight(self):
+        self.assertTrue(is_night(23, 23, 7))
+        self.assertTrue(is_night(3, 23, 7))
+        self.assertFalse(is_night(7, 23, 7))
+        self.assertFalse(is_night(12, 23, 7))
+
+    def test_equal_start_and_end_disables_it(self):
+        self.assertFalse(any(is_night(h, 0, 0) for h in range(24)))
+
+
+class StatsTests(unittest.TestCase):
+    def test_summarises_airlines_routes_and_hours(self):
+        rows = [
+            {"time": "2026-10-23T09:49:26", "hex": "a", "airline": "Ryanair", "origin": "STN", "destination": "DUB",
+             "aircraft_type": "Boeing 737", "distance_km": "8.5"},
+            {"time": "2026-10-23T09:51:08", "hex": "b", "airline": "Ryanair", "origin": "STN", "destination": "DUB",
+             "aircraft_type": "Boeing 737", "distance_km": "3.2"},
+            {"time": "2026-10-23T10:02:00", "hex": "b", "airline": "easyJet", "origin": "", "destination": "",
+             "aircraft_type": "", "distance_km": "20"},
+        ]
+        s = stats.summarise(rows)
+        self.assertEqual((s["total"], s["unique_aircraft"], s["closest_km"]), (3, 2, 3.2))
+        self.assertEqual(s["airlines"][0], ("Ryanair", 2))
+        self.assertEqual(s["routes"], [("STN > DUB", 2)])
+        self.assertEqual(dict(s["hours"])["09:00"], 2)
+
+    def test_empty_log_is_handled(self):
+        s = stats.summarise([])
+        self.assertIn("No sightings", stats.format_text(s))
+        self.assertIn(b"No sightings", stats.render_html(s))
+
+    def test_html_escapes_values(self):
+        s = stats.summarise([{"time": "2026-10-23T09:00:00", "hex": "a", "airline": "<b>x</b>", "distance_km": "1"}])
+        self.assertNotIn(b"<b>x</b>", stats.render_html(s))
+
+
+class DemoTests(unittest.TestCase):
+    def test_cycles_forever_through_recorded_flights(self):
+        it = flights()
+        seen = [next(it) for _ in range(len(FLIGHTS) + 1)]
+        self.assertEqual(seen[0], seen[-1])
+
+    def test_every_flight_has_a_callsign_and_route(self):
+        for ac, details in FLIGHTS:
+            self.assertTrue(ac.callsign and details.origin_code and details.destination_code)
+
+
+if __name__ == "__main__":
+    unittest.main()
