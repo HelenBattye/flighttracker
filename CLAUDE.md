@@ -21,7 +21,7 @@ both receiver (`aircraft`) and public (`ac`) JSON.
 ## Conventions
 - Keep dependencies to `requests` and `Pillow`; `.env` and `waveshare_epd` are handled without extra packages.
 - Network calls must fail soft (the display shows an error card and recovers); tests mock `requests.get`.
-- `logos/`, `photos/`, `sightings.csv`, `preview.png` and `.env` are git-ignored. Logos are trademarks and photos belong to their photographers; don't commit either.
+- `logos/`, `photos/`, `sightings.csv`, `preview.png` and `.env` are git-ignored. Logos and photos are third-party; don't commit either.
 - The e-paper is only redrawn when the card changes (`last_key` in `main.py`); keep that, it protects the panel.
 - Add a test in `tests/test_flighttracker.py` for new behaviour.
 

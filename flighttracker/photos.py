@@ -1,7 +1,6 @@
 """Aircraft photos from the Planespotters.net API, fetched once per aircraft and cached in ./photos.
 
-The photos belong to their photographers, so the photos folder is git-ignored and the card credits
-the photographer. Planespotters requires a descriptive User-Agent: https://www.planespotters.net/photo/api
+The photos folder is git-ignored, so no photos are committed. Planespotters requires a descriptive User-Agent: https://www.planespotters.net/photo/api
 """
 
 from pathlib import Path
@@ -16,7 +15,7 @@ PHOTO_BOX = (130, 76)
 
 
 def _download(hex_code: str, base: Path) -> bool:
-    """Fetch the photo and photographer for an aircraft. Only a definite 'no photo' is remembered."""
+    """Fetch the photo for an aircraft. Only a definite 'no photo' is remembered."""
     try:
         r = requests.get(API.format(hex=hex_code), headers=HEADERS, timeout=5)
         if not r.ok:
@@ -31,7 +30,6 @@ def _download(hex_code: str, base: Path) -> bool:
         if not image.ok:
             return False
         _jpg(base).write_bytes(image.content)
-        base.with_suffix(".txt").write_text(photos[0].get("photographer") or "")
         return True
     except (requests.RequestException, ValueError, KeyError, TypeError, AttributeError):
         return False
@@ -70,8 +68,8 @@ def _atkinson(img: Image.Image) -> Image.Image:
     return out
 
 
-def load_photo(hex_code: str, box: tuple[int, int] = PHOTO_BOX) -> tuple[Image.Image, str] | None:
-    """Return (1-bit dithered photo fitted inside box, photographer) or None if there isn't one."""
+def load_photo(hex_code: str, box: tuple[int, int] = PHOTO_BOX) -> Image.Image | None:
+    """Return the photo as a 1-bit dithered image fitted inside box, or None if there isn't one."""
     if len(hex_code) != 6 or not all(c in "0123456789abcdefABCDEF" for c in hex_code):
         return None
     PHOTO_DIR.mkdir(exist_ok=True)
@@ -86,5 +84,4 @@ def load_photo(hex_code: str, box: tuple[int, int] = PHOTO_BOX) -> tuple[Image.I
     img.thumbnail(box, Image.LANCZOS)
     img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=150, threshold=2))
     img = ImageOps.autocontrast(_flatten(img), cutoff=1)  # a 1-bit panel needs all the contrast it can get
-    credit = base.with_suffix(".txt").read_text() if base.with_suffix(".txt").exists() else ""
-    return _atkinson(img), credit
+    return _atkinson(img)

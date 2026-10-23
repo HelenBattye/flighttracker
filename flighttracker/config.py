@@ -23,7 +23,6 @@ class Config:
     width: int = 400
     height: int = 300
     show_photos: bool = True  # aircraft photo from Planespotters; SHOW_PHOTOS=0 turns it off
-    show_photo_credit: bool = False  # PHOTO_CREDIT=1 prints the photographer's name under the photo
 
 
 def load_dotenv(path: Path | None = None) -> None:
@@ -71,7 +70,6 @@ def load() -> Config:
         night_start=int(os.environ.get("NIGHT_START", 23)),
         night_end=int(os.environ.get("NIGHT_END", 7)),
         show_photos=os.environ.get("SHOW_PHOTOS", "1") != "0",
-        show_photo_credit=os.environ.get("PHOTO_CREDIT", "0") == "1",
     )
 
 

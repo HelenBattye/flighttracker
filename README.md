@@ -61,8 +61,7 @@ screen only when the card changes. If the feed is down the card says so and reco
 
 - **Photos:** the card shows a photo of the aircraft when [Planespotters.net](https://www.planespotters.net)
   has one. Photos are cached in `photos/` (git-ignored; they
-  belong to their photographers). Set `SHOW_PHOTOS=0` to turn them off, or `PHOTO_CREDIT=1` to print the
-  photographer's name under the photo. Photos come from Planespotters.net and belong to their photographers.
+  aren't part of the repo). Set `SHOW_PHOTOS=0` to turn them off.
 - **Speed and altitude** are in knots and feet, as on a flight deck.
 - **ETA** is an estimate: the straight-line distance to the destination at the plane's current speed.
   It ignores the route flown, wind and the slowdown on approach, so it's best on short flights. The

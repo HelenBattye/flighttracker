@@ -253,8 +253,8 @@ def _jpeg_bytes() -> bytes:
     return buf.getvalue()
 
 
-def _photo_responses(photographer="Jane Spotter"):
-    api = _json_response({"photos": [{"thumbnail_large": {"src": "https://t.example/a_280.jpg"}, "photographer": photographer}]})
+def _photo_responses():
+    api = _json_response({"photos": [{"thumbnail_large": {"src": "https://t.example/a_280.jpg"}}]})
     image = Mock(ok=True, content=_jpeg_bytes())
     return [api, image]
 
@@ -274,8 +274,7 @@ class PhotoTests(unittest.TestCase):
         first = photos.load_photo("400a1b")
         second = photos.load_photo("400A1B")
 
-        image, credit = first
-        self.assertEqual(credit, "Jane Spotter")
+        image = first
         self.assertEqual(image.mode, "1")
         self.assertLessEqual(image.width, photos.PHOTO_BOX[0])
         self.assertLessEqual(image.height, photos.PHOTO_BOX[1])
@@ -325,7 +324,7 @@ class PhotoCardTests(unittest.TestCase):
                       "EDI", "Another very long airport name that would run under the photo", "Boeing 737-800")
 
     def _photo(self):
-        return Image.linear_gradient("L").resize((130, 73)).convert("1"), "Jane Spotter"
+        return Image.linear_gradient("L").resize((130, 73)).convert("1")
 
     def test_photo_changes_the_card_and_keeps_its_size(self, _logo):
         plain = render_card(self.aircraft, self.details)
@@ -333,21 +332,13 @@ class PhotoCardTests(unittest.TestCase):
         self.assertEqual(with_photo.size, (400, 300))
         self.assertNotEqual(plain.tobytes(), with_photo.tobytes())
 
-    def test_without_a_credit_the_airport_lines_move_up(self, _logo):
-        pic, _ = self._photo()
-        credited = render_card(self.aircraft, self.details, photo=(pic, "Jane Spotter"))
-        plain = render_card(self.aircraft, self.details, photo=(pic, ""))
-        row = 164 + pic.height + 8
-        self.assertIsNotNone(plain.crop((16, row, 250, row + 9)).convert("L").point(lambda p: 255 - p).getbbox())
-        self.assertIsNone(credited.crop((16, row, 250, row + 9)).convert("L").point(lambda p: 255 - p).getbbox())
-
     def test_photo_sits_level_with_the_speed_row_and_airport_names_run_underneath(self, _logo):
-        pic, credit = self._photo()
-        img = render_card(self.aircraft, self.details, photo=(pic, credit))
+        pic = self._photo()
+        img = render_card(self.aircraft, self.details, photo=pic)
         x = 400 - 16 - pic.width
         self.assertEqual(img.crop((x, 164, x + pic.width, 164 + pic.height)).tobytes(), pic.tobytes())
-        # the departing line is below the photo and credit, so long names can use the full width
-        below_photo = img.crop((16, 164 + pic.height + 19, 384, 164 + pic.height + 19 + 18))
+        # the departing line is below the photo, so long names can use the full width
+        below_photo = img.crop((16, 164 + pic.height + 8, 384, 164 + pic.height + 8 + 18))
         self.assertIsNotNone(below_photo.convert("L").point(lambda p: 255 - p).getbbox())
 
 

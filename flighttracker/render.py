@@ -67,7 +67,7 @@ def render_card(
     d: Details,
     width: int = 400,
     height: int = 300,
-    photo: tuple[Image.Image, str] | None = None,
+    photo: Image.Image | None = None,
     eta: datetime | None = None,
 ) -> Image.Image:
     img, draw = _blank(width, height)
@@ -116,14 +116,9 @@ def render_card(
         draw.text((m, y), f"ETA ~{eta.strftime('%H:%M')}", font=small, fill=0)
         y += 24
     if photo:
-        pic, credit = photo
-        x, top = width - m - pic.width, 164
-        img.paste(pic, (x, top))
-        names_y = top + pic.height + (19 if credit else 8)  # the airport lines tuck up when there's no credit
-        if credit:
-            tiny = _font(FONT_CANDIDATES, 10)
-            draw.text((x, top + pic.height + 3), _fit(draw, f"Photo: {credit}", tiny, pic.width), font=tiny, fill=0)
-        y = max(y, names_y)
+        x, top = width - m - photo.width, 164
+        img.paste(photo, (x, top))
+        y = max(y, top + photo.height + 8)
     if d.origin_name:
         draw.text((m, y), _fit(draw, f"Departing: {d.origin_name}", small, inner), font=small, fill=0)
         y += 22
