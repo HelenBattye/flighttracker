@@ -322,10 +322,14 @@ class PhotoCardTests(unittest.TestCase):
         self.assertEqual(with_photo.size, (400, 300))
         self.assertNotEqual(plain.tobytes(), with_photo.tobytes())
 
-    def test_airport_names_stop_before_the_photo(self, _logo):
-        img = render_card(self.aircraft, self.details, photo=self._photo())
-        left_of_photo = img.crop((254 - 8, 200, 254, 230))  # gutter between the text and the photo
-        self.assertEqual(left_of_photo.convert("L").getextrema(), (255, 255))  # all white
+    def test_photo_sits_level_with_the_speed_row_and_airport_names_run_underneath(self, _logo):
+        pic, credit = self._photo()
+        img = render_card(self.aircraft, self.details, photo=(pic, credit))
+        x = 400 - 16 - pic.width
+        self.assertEqual(img.crop((x, 164, x + pic.width, 164 + pic.height)).tobytes(), pic.tobytes())
+        # the departing line is below the photo and credit, so long names can use the full width
+        below_photo = img.crop((16, 164 + pic.height + 19, 384, 164 + pic.height + 19 + 18))
+        self.assertIsNotNone(below_photo.convert("L").point(lambda p: 255 - p).getbbox())
 
 
 class EtaTests(unittest.TestCase):

@@ -106,24 +106,27 @@ def render_card(
     y = 154  # divider sits at the same height whether or not there's a route
     draw.line((m, y, width - m, y), fill=0)
     y += 10
-    draw.text((m, y), f"{round(ac.speed_kt)} kt", font=mid, fill=0)
-    draw.text((m + 130, y), f"{ac.altitude_ft:,} ft", font=mid, fill=0)
+    speed = f"{round(ac.speed_kt)} kt"
+    draw.text((m, y), speed, font=mid, fill=0)
+    draw.text((m + draw.textlength(speed, font=mid) + 24, y), f"{ac.altitude_ft:,} ft", font=mid, fill=0)
     y += 42
-    # the photo sits bottom right, so the airport lines are shortened to leave it room
-    text_width = inner - PHOTO_BOX[0] - 8 if photo else inner
-    if d.origin_name:
-        draw.text((m, y), _fit(draw, f"Departing: {d.origin_name}", small, text_width), font=small, fill=0)
-        y += 22
-    if d.destination_name:
-        draw.text((m, y), _fit(draw, f"Arriving: {d.destination_name}", small, text_width), font=small, fill=0)
-        y += 22
+    # the photo sits top right, level with the speed row; ETA goes beside it and the airport
+    # names go underneath at full width so they're less likely to be cut off
     if eta:
         draw.text((m, y), f"ETA ~{eta.strftime('%H:%M')} (estimate)", font=small, fill=0)
+        y += 24
     if photo:
         pic, credit = photo
-        x, top = width - m - pic.width, 204
+        x, top = width - m - pic.width, 164
         img.paste(pic, (x, top))
+        names_y = top + pic.height + 19
         if credit:
             tiny = _font(FONT_CANDIDATES, 10)
             draw.text((x, top + pic.height + 3), _fit(draw, f"Photo: {credit}", tiny, pic.width), font=tiny, fill=0)
+        y = max(y, names_y)
+    if d.origin_name:
+        draw.text((m, y), _fit(draw, f"Departing: {d.origin_name}", small, inner), font=small, fill=0)
+        y += 22
+    if d.destination_name:
+        draw.text((m, y), _fit(draw, f"Arriving: {d.destination_name}", small, inner), font=small, fill=0)
     return img
