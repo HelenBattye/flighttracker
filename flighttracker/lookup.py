@@ -17,6 +17,8 @@ class Details:
     destination_code: str = ""
     destination_name: str = ""
     aircraft_type: str = ""
+    destination_lat: float | None = None
+    destination_lon: float | None = None
 
 
 def _get(path: str) -> dict:
@@ -44,5 +46,7 @@ def lookup(callsign: str, hex_code: str) -> Details:
         origin_name=origin.get("name", ""),
         destination_code=dest.get("iata_code", ""),
         destination_name=dest.get("name", ""),
+        destination_lat=dest.get("latitude"),
+        destination_lon=dest.get("longitude"),
         aircraft_type=" ".join(filter(None, [plane.get("manufacturer"), plane.get("type")])),
     )

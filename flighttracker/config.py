@@ -22,19 +22,24 @@ class Config:
     night_end: int = 7
     width: int = 400
     height: int = 300
+    show_photos: bool = True  # aircraft photo from Planespotters; SHOW_PHOTOS=0 turns it off
 
 
-def load_dotenv(path: Path = Path(".env")) -> None:
-    """Read KEY=value lines from a .env file into the environment. Real environment variables win."""
-    if not path.is_file():
-        return
-    for line in path.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
+def load_dotenv(path: Path | None = None) -> None:
+    """Read KEY=value lines from a .env file into the environment. Real environment variables win.
+
+    Looks in the current folder, then next to the code, so it works from anywhere."""
+    paths = [path] if path else [Path(".env"), Path(__file__).resolve().parent.parent / ".env"]
+    for p in paths:
+        if not p.is_file():
             continue
-        key, _, value = line.partition("=")
-        key = key.removeprefix("export ").strip()
-        os.environ.setdefault(key, value.strip().strip("\"'"))
+        for line in p.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.removeprefix("export ").strip()
+            os.environ.setdefault(key, value.strip().strip("\"'"))
 
 
 def _number(name: str, cast):
@@ -64,9 +69,10 @@ def load() -> Config:
         poll_seconds=int(os.environ.get("POLL_SECONDS", 20)),
         night_start=int(os.environ.get("NIGHT_START", 23)),
         night_end=int(os.environ.get("NIGHT_END", 7)),
+        show_photos=os.environ.get("SHOW_PHOTOS", "1") != "0",
     )
 
 
 def demo() -> Config:
     """Settings for --demo: no location or feed needed, and night mode off so there's always a card."""
-    return Config(aircraft_url="demo", home_lat=0, home_lon=0, poll_seconds=8, night_start=0, night_end=0)
+    return Config(aircraft_url="demo", home_lat=0, home_lon=0, poll_seconds=8, night_start=0, night_end=0, show_photos=False)

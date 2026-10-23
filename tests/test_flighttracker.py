@@ -7,13 +7,17 @@ from unittest.mock import Mock, patch
 
 from flighttracker import config, stats
 from flighttracker.demo import FLIGHTS, flights
+from flighttracker.eta import estimate_eta
 from flighttracker.feed import Aircraft, fetch_aircraft
 from datetime import datetime
 
 import requests
 from PIL import Image, ImageDraw
 
+import io
+
 from flighttracker import lookup as lookup_module
+from flighttracker import photos
 from flighttracker.lookup import Details
 from flighttracker.render import _fit, _font, FONT_CANDIDATES, render_card, render_clock, render_error, render_night
 from flighttracker.main import is_night
@@ -241,6 +245,114 @@ class RenderTests(unittest.TestCase):
         self.assertLessEqual(draw.textlength(fitted, font=font), 200)
         self.assertTrue(fitted.endswith("…"))
         self.assertEqual(_fit(draw, "Short", font, 200), "Short")
+
+
+def _jpeg_bytes() -> bytes:
+    buf = io.BytesIO()
+    Image.linear_gradient("L").resize((200, 113)).convert("RGB").save(buf, "JPEG")
+    return buf.getvalue()
+
+
+def _photo_responses(photographer="Jane Spotter"):
+    api = _json_response({"photos": [{"thumbnail": {"src": "https://t.example/a_t.jpg"}, "photographer": photographer}]})
+    image = Mock(ok=True, content=_jpeg_bytes())
+    return [api, image]
+
+
+class PhotoTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        patcher = patch.object(photos, "PHOTO_DIR", Path(self.directory.name) / "photos")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self.directory.cleanup)
+
+    @patch("flighttracker.photos.requests.get")
+    def test_downloads_once_then_uses_the_cache(self, get):
+        get.side_effect = _photo_responses()
+
+        first = photos.load_photo("400a1b")
+        second = photos.load_photo("400A1B")
+
+        image, credit = first
+        self.assertEqual(credit, "Jane Spotter")
+        self.assertEqual(image.mode, "1")
+        self.assertLessEqual(image.width, photos.PHOTO_BOX[0])
+        self.assertLessEqual(image.height, photos.PHOTO_BOX[1])
+        self.assertIsNotNone(second)
+        self.assertEqual(get.call_count, 2)  # one API call and one image download in total
+        self.assertIn("User-Agent", get.call_args.kwargs["headers"])
+
+    @patch("flighttracker.photos.requests.get")
+    def test_aircraft_without_a_photo_are_remembered(self, get):
+        get.return_value = _json_response({"photos": []})
+        self.assertIsNone(photos.load_photo("400a1b"))
+        self.assertIsNone(photos.load_photo("400a1b"))
+        self.assertEqual(get.call_count, 1)
+
+    @patch("flighttracker.photos.requests.get")
+    def test_failures_are_not_remembered_so_it_retries(self, get):
+        get.side_effect = requests.ConnectionError("offline")
+        self.assertIsNone(photos.load_photo("400a1b"))
+        get.side_effect = None
+        get.return_value = _json_response({}, ok=False)  # rate limited
+        self.assertIsNone(photos.load_photo("400a1b"))
+        get.side_effect = _photo_responses()
+        self.assertIsNotNone(photos.load_photo("400a1b"))
+
+    @patch("flighttracker.photos.requests.get")
+    def test_invalid_hex_codes_never_touch_the_network_or_disk(self, get):
+        for bad in ("", "../etc", "zzzzzz", "12345"):
+            self.assertIsNone(photos.load_photo(bad))
+        get.assert_not_called()
+
+
+@patch("flighttracker.render.load_logo", return_value=None)
+class PhotoCardTests(unittest.TestCase):
+    aircraft = Aircraft("abc123", "EXA1", 51.5, -0.1, 12000, 220, 3.3, "B738", "G-ABCD")
+    details = Details("Example Air", "EXA", "LHR", "A very long airport name that would run under the photo",
+                      "EDI", "Another very long airport name that would run under the photo", "Boeing 737-800")
+
+    def _photo(self):
+        return Image.linear_gradient("L").resize((130, 73)).convert("1"), "Jane Spotter"
+
+    def test_photo_changes_the_card_and_keeps_its_size(self, _logo):
+        plain = render_card(self.aircraft, self.details)
+        with_photo = render_card(self.aircraft, self.details, photo=self._photo())
+        self.assertEqual(with_photo.size, (400, 300))
+        self.assertNotEqual(plain.tobytes(), with_photo.tobytes())
+
+    def test_airport_names_stop_before_the_photo(self, _logo):
+        img = render_card(self.aircraft, self.details, photo=self._photo())
+        left_of_photo = img.crop((254 - 8, 200, 254, 230))  # gutter between the text and the photo
+        self.assertEqual(left_of_photo.convert("L").getextrema(), (255, 255))  # all white
+
+
+class EtaTests(unittest.TestCase):
+    now = datetime(2026, 10, 23, 12, 0)
+    edinburgh = Details(destination_lat=55.95, destination_lon=-3.3725)
+
+    def test_straight_line_distance_over_ground_speed(self):
+        # Leeds Bradford to Edinburgh is roughly 255 km, so about 23 minutes at 360 kt (667 km/h)
+        ac = Aircraft("abc123", "EXA1", 53.87, -1.66, 20000, 360, 5)
+        eta = estimate_eta(ac, self.edinburgh, self.now)
+        self.assertTrue(20 <= (eta - self.now).total_seconds() / 60 <= 27)
+
+    def test_no_estimate_without_destination_or_when_slow(self):
+        fast = Aircraft("abc123", "EXA1", 53.87, -1.66, 20000, 360, 5)
+        slow = Aircraft("abc123", "EXA1", 53.87, -1.66, 500, 60, 5)
+        self.assertIsNone(estimate_eta(fast, Details(), self.now))
+        self.assertIsNone(estimate_eta(slow, self.edinburgh, self.now))
+
+    def test_card_shows_the_estimate_and_uses_feet_and_knots(self):
+        ac = Aircraft("abc123", "EXA1", 53.87, -1.66, 20000, 360, 5)
+        with patch("flighttracker.render.load_logo", return_value=None), \
+                patch("flighttracker.render.ImageDraw.ImageDraw.text") as text:
+            render_card(ac, self.edinburgh, eta=datetime(2026, 10, 23, 12, 40))
+        drawn = [call.args[1] for call in text.call_args_list]
+        self.assertIn("360 kt", drawn)
+        self.assertIn("20,000 ft", drawn)
+        self.assertIn("ETA ~12:40 (estimate)", drawn)
 
 
 if __name__ == "__main__":

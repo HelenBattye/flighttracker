@@ -6,8 +6,10 @@ from urllib.parse import urlparse
 from . import config
 from .display import EpaperDisplay, PreviewDisplay, WebDisplay
 from .demo import flights as demo_flights
+from .eta import estimate_eta
 from .feed import fetch_aircraft
 from .lookup import lookup
+from .photos import load_photo
 from .render import render_card, render_clock, render_error, render_night
 from .select import pick
 from .sightings import log_sighting
@@ -57,7 +59,9 @@ def main() -> None:
             elif ac:
                 if not demo:
                     details = lookup(ac.callsign, ac.hex)
-                key, card = ac.hex, lambda: render_card(ac, details, *size)
+                key, card = ac.hex, lambda: render_card(
+                        ac, details, *size, photo=load_photo(ac.hex) if cfg.show_photos else None, eta=estimate_eta(ac, details)
+                    )
             else:
                 key, card = now.strftime("%H:%M"), lambda: render_clock(*size, now)  # redraw each minute
 

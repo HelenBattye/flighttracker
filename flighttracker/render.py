@@ -5,6 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .feed import Aircraft
 from .logos import load_logo
 from .lookup import Details
+from .photos import PHOTO_BOX
 
 FONT_CANDIDATES = [
     "/System/Library/Fonts/Helvetica.ttc",
@@ -61,7 +62,14 @@ def render_error(message: str, width: int = 400, height: int = 300, now: datetim
     return img
 
 
-def render_card(ac: Aircraft, d: Details, width: int = 400, height: int = 300) -> Image.Image:
+def render_card(
+    ac: Aircraft,
+    d: Details,
+    width: int = 400,
+    height: int = 300,
+    photo: tuple[Image.Image, str] | None = None,
+    eta: datetime | None = None,
+) -> Image.Image:
     img, draw = _blank(width, height)
     m = 16
     inner = width - 2 * m
@@ -98,14 +106,24 @@ def render_card(ac: Aircraft, d: Details, width: int = 400, height: int = 300) -
     y = 154  # divider sits at the same height whether or not there's a route
     draw.line((m, y, width - m, y), fill=0)
     y += 10
-    kmh = round(ac.speed_kt * 1.852)
-    metres = round(ac.altitude_ft * 0.3048)
-    draw.text((m, y), f"{kmh} km/h", font=mid, fill=0)
-    draw.text((m + 180, y), f"{metres} m", font=mid, fill=0)
+    draw.text((m, y), f"{round(ac.speed_kt)} kt", font=mid, fill=0)
+    draw.text((m + 130, y), f"{ac.altitude_ft:,} ft", font=mid, fill=0)
     y += 42
+    # the photo sits bottom right, so the airport lines are shortened to leave it room
+    text_width = inner - PHOTO_BOX[0] - 8 if photo else inner
     if d.origin_name:
-        draw.text((m, y), _fit(draw, f"Departing: {d.origin_name}", small, inner), font=small, fill=0)
+        draw.text((m, y), _fit(draw, f"Departing: {d.origin_name}", small, text_width), font=small, fill=0)
         y += 22
     if d.destination_name:
-        draw.text((m, y), _fit(draw, f"Arriving: {d.destination_name}", small, inner), font=small, fill=0)
+        draw.text((m, y), _fit(draw, f"Arriving: {d.destination_name}", small, text_width), font=small, fill=0)
+        y += 22
+    if eta:
+        draw.text((m, y), f"ETA ~{eta.strftime('%H:%M')} (estimate)", font=small, fill=0)
+    if photo:
+        pic, credit = photo
+        x, top = width - m - pic.width, 204
+        img.paste(pic, (x, top))
+        if credit:
+            tiny = _font(FONT_CANDIDATES, 10)
+            draw.text((x, top + pic.height + 3), _fit(draw, f"Photo: {credit}", tiny, pic.width), font=tiny, fill=0)
     return img

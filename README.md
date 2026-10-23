@@ -57,6 +57,16 @@ One small loop in `main.py`: poll the feed, keep the nearest aircraft (sticking 
 so the card doesn't flicker between two planes), look up its route, draw a 1-bit card, and redraw the
 screen only when the card changes. If the feed is down the card says so and recovers on its own.
 
+## Photos, speed and ETA
+
+- **Photos:** the card shows a photo of the aircraft when [Planespotters.net](https://www.planespotters.net)
+  has one, credited to the photographer on the card. Photos are cached in `photos/` (git-ignored; they
+  belong to their photographers). Set `SHOW_PHOTOS=0` to turn them off.
+- **Speed and altitude** are in knots and feet, as on a flight deck.
+- **ETA** is an estimate: the straight-line distance to the destination at the plane's current speed.
+  It ignores the route flown, wind and the slowdown on approach, so it's best on short flights. The
+  free data sources don't include take-off times, so the card doesn't show one.
+
 ## Stats
 
 Every flight shown is logged to `sightings.csv`. See what flies over you at http://localhost:8000/stats,
@@ -79,8 +89,8 @@ They run offline, and GitHub Actions runs them on every push.
 
 - **Show more than one aircraft** when several are overhead, such as the nearest plus a short "also
   nearby" list, instead of picking one.
-- **Unit options:** feet, knots and miles as an alternative to metres and km/h.
-- **Photos** of the aircraft from its registration, dithered for the e-paper.
+- **Unit options:** a setting to switch between feet/knots and metres/km/h.
+- **Take-off time and a better ETA** from a flight-schedule API (these are paid or need a key).
 - **Better demo and stats:** a replay of a real day from `sightings.csv`, and charts in `/stats`.
 - **Packaging:** a `pyproject.toml` so it installs with `pip install .` and has a `flighttracker` command.
 - **Alerts:** highlight rare types (A380, military, vintage) in the log.
