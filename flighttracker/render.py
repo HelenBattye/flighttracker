@@ -113,7 +113,7 @@ def render_card(
     # the photo sits top right, level with the speed row; ETA goes beside it and the airport
     # names go underneath at full width so they're less likely to be cut off
     if eta:
-        draw.text((m, y), f"ETA ~{eta.strftime('%H:%M')} (estimate)", font=small, fill=0)
+        draw.text((m, y), f"ETA ~{eta.strftime('%H:%M')}", font=small, fill=0)
         y += 24
     if photo:
         pic, credit = photo

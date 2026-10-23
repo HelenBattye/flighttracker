@@ -356,7 +356,7 @@ class EtaTests(unittest.TestCase):
         drawn = [call.args[1] for call in text.call_args_list]
         self.assertIn("360 kt", drawn)
         self.assertIn("20,000 ft", drawn)
-        self.assertIn("ETA ~12:40 (estimate)", drawn)
+        self.assertIn("ETA ~12:40", drawn)
 
 
 if __name__ == "__main__":
