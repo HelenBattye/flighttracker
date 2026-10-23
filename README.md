@@ -6,6 +6,13 @@ adsbdb.com for route and aircraft details.
 
 ![A card showing a British Airways 777 from LHR to JFK](docs/screenshot.png)
 
+## Why I built it
+
+My son loves planes and is glued to Flightradar24, so I built him a little screen for the shelf that
+shows what's flying over our house right now: the airline, the route, the aircraft type, how high and
+how fast. It sits in the corner and updates by itself, so he can look up when he hears an engine and
+know what it is.
+
 ## Try it in 30 seconds
 
 No receiver, hardware or location needed:
@@ -67,6 +74,16 @@ python -m unittest discover -s tests
 ```
 
 They run offline, and GitHub Actions runs them on every push.
+
+## What I'd do next
+
+- **Show more than one aircraft** when several are overhead, such as the nearest plus a short "also
+  nearby" list, instead of picking one.
+- **Unit options:** feet, knots and miles as an alternative to metres and km/h.
+- **Photos** of the aircraft from its registration, dithered for the e-paper.
+- **Better demo and stats:** a replay of a real day from `sightings.csv`, and charts in `/stats`.
+- **Packaging:** a `pyproject.toml` so it installs with `pip install .` and has a `flighttracker` command.
+- **Alerts:** highlight rare types (A380, military, vintage) in the log.
 
 ## Airline logos
 

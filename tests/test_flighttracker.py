@@ -8,7 +8,14 @@ from unittest.mock import Mock, patch
 from flighttracker import config, stats
 from flighttracker.demo import FLIGHTS, flights
 from flighttracker.feed import Aircraft, fetch_aircraft
+from datetime import datetime
+
+import requests
+from PIL import Image, ImageDraw
+
+from flighttracker import lookup as lookup_module
 from flighttracker.lookup import Details
+from flighttracker.render import _fit, _font, FONT_CANDIDATES, render_card, render_clock, render_error, render_night
 from flighttracker.main import is_night
 from flighttracker.select import pick
 from flighttracker.sightings import FIELDS, log_sighting
@@ -157,6 +164,83 @@ class DemoTests(unittest.TestCase):
     def test_every_flight_has_a_callsign_and_route(self):
         for ac, details in FLIGHTS:
             self.assertTrue(ac.callsign and details.origin_code and details.destination_code)
+
+
+def _json_response(payload, ok=True):
+    response = Mock(ok=ok)
+    response.json.return_value = payload
+    return response
+
+
+class LookupTests(unittest.TestCase):
+    def setUp(self):
+        lookup_module.lookup.cache_clear()
+
+    @patch("flighttracker.lookup.requests.get")
+    def test_combines_route_and_aircraft_details(self, get):
+        route = {"response": {"flightroute": {
+            "airline": {"name": "Example Air", "icao": "EXA"},
+            "origin": {"iata_code": "LHR", "name": "London Heathrow"},
+            "destination": {"iata_code": "EDI", "name": "Edinburgh"},
+        }}}
+        plane = {"response": {"aircraft": {"manufacturer": "Boeing", "type": "737-800"}}}
+        get.side_effect = [_json_response(route), _json_response(plane)]
+
+        d = lookup_module.lookup("EXA1", "abc123")
+
+        self.assertEqual((d.airline, d.airline_icao, d.origin_code, d.destination_code), ("Example Air", "EXA", "LHR", "EDI"))
+        self.assertEqual(d.aircraft_type, "Boeing 737-800")
+
+    @patch("flighttracker.lookup.requests.get")
+    def test_network_failure_gives_empty_details(self, get):
+        get.side_effect = requests.ConnectionError("offline")
+        self.assertEqual(lookup_module.lookup("EXA1", "abc123"), Details())
+
+    @patch("flighttracker.lookup.requests.get")
+    def test_unknown_flight_and_string_responses_are_tolerated(self, get):
+        # adsbdb answers "unknown callsign" with a string in "response"
+        get.return_value = _json_response({"response": "unknown callsign"})
+        self.assertEqual(lookup_module.lookup("N123", "abc123"), Details())
+
+    @patch("flighttracker.lookup.requests.get")
+    def test_results_are_cached(self, get):
+        get.return_value = _json_response({"response": {}})
+        lookup_module.lookup("EXA1", "abc123")
+        lookup_module.lookup("EXA1", "abc123")
+        self.assertEqual(get.call_count, 2)  # one route + one aircraft request, not four
+
+
+@patch("flighttracker.render.load_logo", return_value=None)
+class RenderTests(unittest.TestCase):
+    aircraft = Aircraft("abc123", "EXA1", 51.5, -0.1, 12000, 220, 3.3, "B738", "G-ABCD")
+
+    def test_cards_are_one_bit_and_the_requested_size(self, _logo):
+        details = Details("Example Air", "EXA", "LHR", "London Heathrow", "EDI", "Edinburgh", "Boeing 737-800")
+        for img in (
+            render_card(self.aircraft, details),
+            render_card(self.aircraft, details, 200, 150),
+            render_clock(now=datetime(2026, 10, 23, 9, 5)),
+            render_night(7),
+            render_error("pi.local: Timeout"),
+        ):
+            self.assertEqual(img.mode, "1")
+        self.assertEqual(render_card(self.aircraft, details).size, (400, 300))
+        self.assertEqual(render_card(self.aircraft, details, 200, 150).size, (200, 150))
+
+    def test_card_draws_something_with_and_without_a_route(self, _logo):
+        routed = Details("Example Air", "EXA", "LHR", "London Heathrow", "EDI", "Edinburgh", "Boeing 737-800")
+        for details in (routed, Details()):
+            img = render_card(self.aircraft, details)
+            self.assertIsNotNone(img.convert("L").point(lambda p: 255 - p).getbbox())  # something non-white
+        self.assertNotEqual(render_card(self.aircraft, routed).tobytes(), render_card(self.aircraft, Details()).tobytes())
+
+    def test_long_text_is_shortened_to_fit(self, _logo):
+        draw = ImageDraw.Draw(Image.new("1", (400, 300), 1))
+        font = _font(FONT_CANDIDATES, 15)
+        fitted = _fit(draw, "A very long airport name " * 5, font, 200)
+        self.assertLessEqual(draw.textlength(fitted, font=font), 200)
+        self.assertTrue(fitted.endswith("…"))
+        self.assertEqual(_fit(draw, "Short", font, 200), "Short")
 
 
 if __name__ == "__main__":
